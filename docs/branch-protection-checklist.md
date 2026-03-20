@@ -30,3 +30,4 @@ cd backend && uv run pytest -q
 cd frontend && npm run lint
 cd frontend && npm run test:unit
 ```
+
