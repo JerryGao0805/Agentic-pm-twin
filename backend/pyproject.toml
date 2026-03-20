@@ -19,3 +19,8 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+markers = [
+  "live: tests that require real external services and GitHub environment secrets",
+]

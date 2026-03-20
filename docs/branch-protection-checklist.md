@@ -22,6 +22,7 @@ Mark these checks as required:
 Keep this check non-required while E2E is being stabilized:
 
 - `frontend-e2e`
+- `backend-live-integration`
 
 ## Local pre-push commands
 
@@ -30,4 +31,3 @@ cd backend && uv run pytest -q
 cd frontend && npm run lint
 cd frontend && npm run test:unit
 ```
-
