@@ -9,10 +9,40 @@ on:
       - main
 
 jobs:
+  live-integration-preflight:
+    name: live-integration-preflight
+    runs-on: ubuntu-latest
+    environment: integration
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+    steps:
+      - name: Validate required integration secrets and variables
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${MYSQL_ROOT_PASSWORD:-}" ]]; then
+            echo "::error::Missing required environment secret MYSQL_ROOT_PASSWORD (environment: integration)."
+            exit 1
+          fi
+
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo "::error::Missing required environment secret OPENAI_API_KEY (environment: integration)."
+            exit 1
+          fi
+
+          if [[ -z "${OPENAI_MODEL:-}" ]]; then
+            echo "::error::Missing required environment variable OPENAI_MODEL (environment: integration)."
+            exit 1
+          fi
+
   backend-live-integration:
     name: backend-live-integration
     runs-on: ubuntu-latest
     environment: integration
+    needs: live-integration-preflight
     services:
       mysql:
         image: mysql:8.4
@@ -32,7 +62,7 @@ jobs:
     env:
       RUN_LIVE_TESTS: "1"
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o-mini' }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       DB_HOST: 127.0.0.1
       DB_PORT: "3306"
       DB_USER: root

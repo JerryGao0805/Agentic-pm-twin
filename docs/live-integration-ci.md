@@ -6,6 +6,7 @@ This project now has a dedicated live integration workflow:
 - Job name: `backend-live-integration`
 - Trigger: `main` pushes, nightly schedule, and manual dispatch
 - Environment: `integration`
+- Preflight validation job: `live-integration-preflight`
 
 ## 1) Create the GitHub Environment
 
@@ -20,8 +21,8 @@ In GitHub repository settings:
 Under environment `integration`:
 
 - Secret: `OPENAI_API_KEY`
-- Secret: `MYSQL_ROOT_PASSWORD`
-- Variable: `OPENAI_MODEL` (recommended value: ``)
+- Secret: `MYSQL_ROOT_PASSWORD` (required)
+- Variable: `OPENAI_MODEL` (required, recommended value: `gpt-4o-mini`)
 
 ## 3) How the Workflow Uses Them
 
@@ -32,6 +33,7 @@ The workflow injects values as environment variables for tests:
 - MySQL credentials from `secrets.MYSQL_ROOT_PASSWORD`
 
 Live tests only run when `RUN_LIVE_TESTS=1` is present (set in workflow).
+If required values are missing, `live-integration-preflight` fails immediately with a clear error.
 
 ## 4) Branch Protection Recommendation
 
@@ -48,4 +50,3 @@ Keep `backend-live-integration` non-required until you decide to make live check
 - Never put real secrets in repository files.
 - Use environment-scoped secrets (not repo-wide) for production-like checks.
 - Avoid running secret-backed live tests on untrusted fork PRs.
-
