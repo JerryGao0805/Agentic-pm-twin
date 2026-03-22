@@ -53,7 +53,11 @@ describe("AuthGate", () => {
     await userEvent.type(screen.getByLabelText(/password/i), "password");
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
 
-    expect(await screen.findByRole("button", { name: /log out/i })).toBeInTheDocument();
+    // Username button opens the dropdown menu
+    const userButton = await screen.findByRole("button", { name: "user" });
+    expect(userButton).toBeInTheDocument();
+    await userEvent.click(userButton);
+    expect(screen.getByText(/log out/i)).toBeInTheDocument();
   });
 
   it("shows an error for invalid credentials", async () => {
@@ -85,8 +89,10 @@ describe("AuthGate", () => {
 
     render(<AuthGate />);
 
-    await screen.findByRole("button", { name: /log out/i });
-    await userEvent.click(screen.getByRole("button", { name: /log out/i }));
+    // Open the user dropdown first
+    const userButton = await screen.findByRole("button", { name: "user" });
+    await userEvent.click(userButton);
+    await userEvent.click(screen.getByText(/log out/i));
 
     expect(await screen.findByRole("heading", { name: /sign in/i })).toBeInTheDocument();
   });
@@ -125,7 +131,11 @@ describe("AuthGate", () => {
     await userEvent.type(screen.getByLabelText(/password/i), "securepassword");
     await userEvent.click(screen.getByRole("button", { name: /create account/i }));
 
-    expect(await screen.findByRole("button", { name: /log out/i })).toBeInTheDocument();
+    // Username button opens the dropdown menu
+    const userButton = await screen.findByRole("button", { name: "newuser" });
+    expect(userButton).toBeInTheDocument();
+    await userEvent.click(userButton);
+    expect(screen.getByText(/log out/i)).toBeInTheDocument();
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/register",
