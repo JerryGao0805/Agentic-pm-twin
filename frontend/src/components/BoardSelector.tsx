@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { BoardSummary } from "@/lib/kanban";
+import { TemplateSelector } from "@/components/TemplateSelector";
 
 type BoardSelectorProps = {
   activeBoardId: number | null;
@@ -15,6 +16,7 @@ export const BoardSelector = ({
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newBoardName, setNewBoardName] = useState("");
+  const [newBoardTemplate, setNewBoardTemplate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const loadBoards = useCallback(async () => {
@@ -49,7 +51,7 @@ export const BoardSelector = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, ...(newBoardTemplate ? { template: newBoardTemplate } : {}) }),
       });
 
       if (!response.ok) {
@@ -59,6 +61,7 @@ export const BoardSelector = ({
 
       const newBoard = (await response.json()) as { id: number; name: string };
       setNewBoardName("");
+      setNewBoardTemplate("");
       setIsCreating(false);
       await loadBoards();
       onSelectBoard(newBoard.id);
@@ -119,6 +122,7 @@ export const BoardSelector = ({
         ))}
         {isCreating ? (
           <div className="flex items-center gap-2">
+            <TemplateSelector value={newBoardTemplate} onChange={setNewBoardTemplate} />
             <input
               value={newBoardName}
               onChange={(e) => setNewBoardName(e.target.value)}
@@ -127,6 +131,7 @@ export const BoardSelector = ({
                 if (e.key === "Escape") {
                   setIsCreating(false);
                   setNewBoardName("");
+                  setNewBoardTemplate("");
                 }
               }}
               placeholder="Board name"
@@ -145,6 +150,7 @@ export const BoardSelector = ({
               onClick={() => {
                 setIsCreating(false);
                 setNewBoardName("");
+                setNewBoardTemplate("");
               }}
               className="text-xs text-[var(--gray-text)] hover:text-[var(--navy-dark)]"
             >

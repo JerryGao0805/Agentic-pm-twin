@@ -15,6 +15,7 @@ import {
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { AISidebarChat } from "@/components/AISidebarChat";
+import { BoardActivityFeed } from "@/components/BoardActivityFeed";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
 const LOCAL_BOARD_KEY = "pm-local-board";
@@ -251,7 +252,7 @@ export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
     }));
   };
 
-  const handleUpdateCard = (cardId: string, updates: Partial<{ title: string; details: string; priority: "low" | "medium" | "high" | null; due_date: string | null; assignee: string | null }>) => {
+  const handleUpdateCard = (cardId: string, updates: Partial<{ title: string; details: string; priority: "low" | "medium" | "high" | null; due_date: string | null; assignee: string | null; label_ids: string[] }>) => {
     applyBoardUpdate((previousBoard) => ({
       ...previousBoard,
       cards: {
@@ -388,6 +389,8 @@ export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
                     key={column.id}
                     column={column}
                     cards={column.cardIds.map((cardId) => board.cards[cardId]).filter(Boolean)}
+                    labels={board.labels}
+                    boardId={board.id}
                     onRename={handleRenameColumn}
                     onAddCard={handleAddCard}
                     onDeleteCard={handleDeleteCard}
@@ -430,6 +433,11 @@ export const KanbanBoard = ({ boardId }: KanbanBoardProps) => {
             </button>
             <div className={`${isSidebarOpen ? "block" : "hidden"} xl:block`}>
               <AISidebarChat board={board} onBoardUpdate={handleAIBoardUpdate} boardId={boardId ?? undefined} />
+              {board.id ? (
+                <div className="mt-4">
+                  <BoardActivityFeed boardId={board.id} />
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

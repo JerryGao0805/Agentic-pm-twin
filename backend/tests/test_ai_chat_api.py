@@ -26,7 +26,7 @@ class FakeBoardService:
     def list_boards(self, username: str) -> list:
         return []
 
-    def create_board(self, username: str, name: str) -> dict:
+    def create_board(self, username: str, name: str, template: str | None = None) -> dict:
         return default_board()
 
     def delete_board(self, username: str, board_id: int) -> bool:

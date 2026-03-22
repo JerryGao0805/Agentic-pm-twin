@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { BoardSelector } from "@/components/BoardSelector";
+import { ProfileModal } from "@/components/ProfileModal";
 
 const LOCAL_AUTH_KEY = "pm-local-authenticated";
 const DEV_USERNAME = process.env.NODE_ENV !== "production" ? "user" : "";
@@ -278,20 +279,52 @@ export const AuthGate = () => {
     );
   }
 
+  const [showProfile, setShowProfile] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const displayUsername = loggedInUsername || DEV_USERNAME;
+
   return (
     <div className="pb-4">
       <div className="mx-auto max-w-[1500px] px-6 pt-6">
         <div className="flex items-center justify-between rounded-2xl border border-[var(--stroke)] bg-white px-4 py-3 shadow-[var(--shadow)]">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
-            Signed in as <span className="text-[var(--navy-dark)]">{loggedInUsername || DEV_USERNAME}</span>
+            Signed in as <span className="text-[var(--navy-dark)]">{displayUsername}</span>
           </p>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
-          >
-            Log out
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowUserMenu((open) => !open)}
+              className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+            >
+              {displayUsername}
+            </button>
+            {showUserMenu ? (
+              <div className="absolute right-0 top-full z-40 mt-2 min-w-[160px] rounded-xl border border-[var(--stroke)] bg-white py-1 shadow-lg">
+                {authMode === "api" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowProfile(true);
+                      setShowUserMenu(false);
+                    }}
+                    className="block w-full px-4 py-2 text-left text-xs font-semibold text-[var(--navy-dark)] hover:bg-[var(--surface)]"
+                  >
+                    Profile
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    handleLogout();
+                  }}
+                  className="block w-full px-4 py-2 text-left text-xs font-semibold text-[var(--navy-dark)] hover:bg-[var(--surface)]"
+                >
+                  Log out
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
       {authMode === "api" ? (
@@ -301,6 +334,17 @@ export const AuthGate = () => {
         />
       ) : null}
       <KanbanBoard boardId={activeBoardId} />
+      {showProfile ? (
+        <ProfileModal
+          username={displayUsername}
+          onClose={() => setShowProfile(false)}
+          onAccountDeleted={() => {
+            setShowProfile(false);
+            setAuthState("unauthenticated");
+            setLoggedInUsername("");
+          }}
+        />
+      ) : null}
     </div>
   );
 };

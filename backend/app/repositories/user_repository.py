@@ -56,3 +56,69 @@ class UserRepository:
 
     def verify_password(self, password: str, password_hash: str) -> bool:
         return bcrypt.checkpw(password.encode(), password_hash.encode())
+
+    def get_profile(self, username: str) -> dict[str, Any] | None:
+        connection = None
+        cursor = None
+        try:
+            connection = get_connection(database=settings.db_name)
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT u.id, u.username, u.created_at, COUNT(b.id) AS board_count "
+                "FROM users u LEFT JOIN boards b ON u.id = b.user_id "
+                "WHERE u.username = %s GROUP BY u.id",
+                (username,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return {
+                "id": int(row[0]),
+                "username": str(row[1]),
+                "created_at": str(row[2]),
+                "board_count": int(row[3]),
+            }
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    def update_password(self, username: str, new_password: str) -> bool:
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        connection = None
+        cursor = None
+        try:
+            connection = get_connection(database=settings.db_name)
+            cursor = connection.cursor()
+            cursor.execute(
+                "UPDATE users SET password_hash = %s WHERE username = %s",
+                (new_hash, username),
+            )
+            updated = cursor.rowcount > 0
+            connection.commit()
+            return updated
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    def delete_user(self, username: str) -> bool:
+        connection = None
+        cursor = None
+        try:
+            connection = get_connection(database=settings.db_name)
+            cursor = connection.cursor()
+            cursor.execute(
+                "DELETE FROM users WHERE username = %s",
+                (username,),
+            )
+            deleted = cursor.rowcount > 0
+            connection.commit()
+            return deleted
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()

@@ -1,3 +1,9 @@
+export type Label = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type Card = {
   id: string;
   title: string;
@@ -5,6 +11,7 @@ export type Card = {
   priority?: "low" | "medium" | "high" | null;
   due_date?: string | null;
   assignee?: string | null;
+  label_ids?: string[];
 };
 
 export type Column = {
@@ -18,6 +25,7 @@ export type BoardData = {
   name?: string;
   columns: Column[];
   cards: Record<string, Card>;
+  labels?: Label[];
 };
 
 export type BoardSummary = {
@@ -27,6 +35,7 @@ export type BoardSummary = {
 };
 
 export const initialData: BoardData = {
+  labels: [],
   columns: [
     { id: "col-backlog", title: "Backlog", cardIds: ["card-1", "card-2"] },
     { id: "col-discovery", title: "Discovery", cardIds: ["card-3"] },
@@ -185,6 +194,20 @@ export const createId = (prefix: string) => {
 export const priorityLabel = (priority: Card["priority"]): string => {
   if (!priority) return "";
   return priority.charAt(0).toUpperCase() + priority.slice(1);
+};
+
+export const labelColor = (color: string): string => {
+  const map: Record<string, string> = {
+    red: "bg-red-100 text-red-700 border-red-200",
+    orange: "bg-orange-100 text-orange-700 border-orange-200",
+    yellow: "bg-yellow-100 text-yellow-700 border-yellow-200",
+    green: "bg-green-100 text-green-700 border-green-200",
+    blue: "bg-blue-100 text-blue-700 border-blue-200",
+    indigo: "bg-indigo-100 text-indigo-700 border-indigo-200",
+    purple: "bg-purple-100 text-purple-700 border-purple-200",
+    pink: "bg-pink-100 text-pink-700 border-pink-200",
+  };
+  return map[color] ?? "bg-gray-100 text-gray-700 border-gray-200";
 };
 
 export const priorityColor = (priority: Card["priority"]): string => {

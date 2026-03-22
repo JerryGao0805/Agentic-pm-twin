@@ -82,14 +82,14 @@ class BoardRepository:
             if connection is not None:
                 connection.close()
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
+    def create_board(self, username: str, name: str, initial_board: dict[str, Any] | None = None) -> dict[str, Any]:
         connection = None
         cursor = None
         try:
             connection = get_connection(database=settings.db_name)
             cursor = connection.cursor()
             user_id = ensure_user_id(cursor, username)
-            board = default_board()
+            board = initial_board if initial_board is not None else default_board()
             cursor.execute(
                 """
                 INSERT INTO boards (user_id, name, board_json)
