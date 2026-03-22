@@ -59,6 +59,7 @@ export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,9 +72,10 @@ export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
         });
         if (resp.ok && active) {
           setEntries(await resp.json());
+          setError(null);
         }
       } catch {
-        // ignore
+        if (active) setError("Failed to load activity.");
       }
     };
     void fetchActivity();
@@ -88,6 +90,7 @@ export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
+        aria-expanded={isOpen}
         className="flex w-full items-center justify-between px-5 py-4 text-left"
       >
         <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
@@ -99,7 +102,9 @@ export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
       </button>
       {isOpen && (
         <div className="border-t border-[var(--stroke)] px-5 py-4">
-          {entries.length === 0 ? (
+          {error ? (
+            <p className="text-xs font-semibold text-[#b42318]">{error}</p>
+          ) : entries.length === 0 ? (
             <p className="text-xs text-[var(--gray-text)]">No activity yet.</p>
           ) : (
             <div className="space-y-3">

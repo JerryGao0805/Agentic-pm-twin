@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.repositories.comment_repository import CommentRepository
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_html(text: str) -> str:
+    return _HTML_TAG_RE.sub("", text)
 
 
 class CommentService:
@@ -17,7 +24,7 @@ class CommentService:
     def add_comment(
         self, board_id: int, card_id: str, username: str, content: str
     ) -> dict[str, Any]:
-        content = content.strip()
+        content = _strip_html(content.strip())
         if not content:
             raise ValueError("Comment cannot be empty.")
         if len(content) > 2000:

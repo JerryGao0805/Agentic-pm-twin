@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
@@ -14,7 +14,7 @@ type KanbanCardProps = {
   onUpdate: (updates: Partial<Card>) => void;
 };
 
-export const KanbanCard = ({ card, labels = [], boardId, onDelete, onUpdate }: KanbanCardProps) => {
+export const KanbanCard = memo(function KanbanCard({ card, labels = [], boardId, onDelete, onUpdate }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
   const [isExpanded, setIsExpanded] = useState(false);
@@ -95,6 +95,7 @@ export const KanbanCard = ({ card, labels = [], boardId, onDelete, onUpdate }: K
               setIsExpanded(!isExpanded);
             }}
             className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+            aria-label={`Edit card ${card.title}`}
           >
             Edit
           </button>
@@ -200,4 +201,4 @@ export const KanbanCard = ({ card, labels = [], boardId, onDelete, onUpdate }: K
       ) : null}
     </article>
   );
-};
+});

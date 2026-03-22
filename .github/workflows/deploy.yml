@@ -43,9 +43,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
           script: |
-            cd /home/ubuntu/Agentic-pm-twin
+            cd ${{ vars.DEPLOY_PATH || '/home/ubuntu/Agentic-pm-twin' }}
             git fetch origin main
-            git reset --hard origin/main
+            git checkout main
+            git pull --ff-only origin main
             docker compose -f docker-compose.prod.yml up --build -d
             docker image prune -f
 
@@ -53,14 +54,14 @@ jobs:
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          for i in $(seq 1 12); do
+          for i in $(seq 1 18); do
             status=$(curl -s -o /dev/null -w "%{http_code}" "http://${EC2_HOST}/api/health" 2>/dev/null || true)
             if [ "$status" = "200" ]; then
               echo "Health check passed"
               exit 0
             fi
-            echo "Attempt $i/12: status=$status, retrying in 5s..."
+            echo "Attempt $i/18: status=$status, retrying in 5s..."
             sleep 5
           done
-          echo "Health check failed after 60s"
+          echo "Health check failed after 90s"
           exit 1

@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 from typing import Any
 
 import app.repositories.board_repository as repository_module
@@ -54,13 +55,21 @@ class RecordingConnection:
         return None
 
 
+def _patch_db(monkeypatch, cursor, connection):
+    @contextmanager
+    def fake_db_connection(*, commit=True):
+        yield connection, cursor
+        if commit:
+            connection.commit()
+    monkeypatch.setattr(repository_module, "db_connection", fake_db_connection)
+    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+
+
 def test_get_board_returns_existing_payload(monkeypatch) -> None:
     board = default_board()
     cursor = RecordingCursor(fetch_values=[(1, "My Board", json.dumps(board))])
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     loaded = repository.get_board("user")
@@ -74,9 +83,7 @@ def test_get_board_returns_existing_payload(monkeypatch) -> None:
 def test_get_board_seeds_default_board_when_missing(monkeypatch) -> None:
     cursor = RecordingCursor(fetch_values=[None])
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     loaded = repository.get_board("user")
@@ -92,9 +99,7 @@ def test_save_board_uses_update_when_board_id_provided(monkeypatch) -> None:
     board = default_board()
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     repository.save_board("user", board, board_id=5)
@@ -109,9 +114,7 @@ def test_list_boards(monkeypatch) -> None:
         (2, "Board B", "2026-01-02"),
     ])
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     boards = repository.list_boards("user")
@@ -124,9 +127,7 @@ def test_list_boards(monkeypatch) -> None:
 def test_create_board(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     board = repository.create_board("user", "Sprint Board")
@@ -139,9 +140,7 @@ def test_create_board(monkeypatch) -> None:
 def test_delete_board(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     result = repository.delete_board("user", 5)
@@ -153,9 +152,7 @@ def test_delete_board(monkeypatch) -> None:
 def test_rename_board(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 21)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = BoardRepository()
     result = repository.rename_board("user", 5, "New Name")

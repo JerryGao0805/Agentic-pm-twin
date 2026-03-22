@@ -1,5 +1,9 @@
+import os
 from pathlib import Path
 import sys
+
+# Must be set before any app module is imported
+os.environ.setdefault("SESSION_SECRET", "test-secret-for-unit-tests")
 
 import pytest
 

@@ -385,7 +385,7 @@ export const AISidebarChat = ({ board, onBoardUpdate, boardId }: AISidebarChatPr
               const isUser = message.role === "user";
               return (
                 <li
-                  key={`${message.role}-${index}`}
+                  key={`${message.role}-${index}-${message.content.slice(0, 20)}`}
                   className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                 >
                   <div

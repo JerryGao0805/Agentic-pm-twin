@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.config import settings
-from app.db import ensure_user_id, get_connection
+from app.db import db_connection, ensure_user_id
 from app.kanban import ChatRole
 
 
@@ -16,12 +15,7 @@ class ChatRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, str]]:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
-
+        with db_connection() as (connection, cursor):
             user_id = ensure_user_id(cursor, username)
 
             if board_id is not None:
@@ -51,18 +45,12 @@ class ChatRepository:
                     (user_id, limit, offset),
                 )
             rows = cursor.fetchall()
-            connection.commit()
 
             messages: list[dict[str, str]] = []
             for role, content in rows:
                 messages.append({"role": str(role), "content": str(content)})
 
             return messages
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()
 
     def append_message(
         self,
@@ -71,12 +59,7 @@ class ChatRepository:
         content: str,
         board_id: int | None = None,
     ) -> None:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
-
+        with db_connection() as (connection, cursor):
             user_id = ensure_user_id(cursor, username)
 
             cursor.execute(
@@ -86,9 +69,3 @@ class ChatRepository:
                 """,
                 (user_id, board_id, role, content),
             )
-            connection.commit()
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()

@@ -1,3 +1,4 @@
+import logging
 import time
 from collections import defaultdict
 from typing import Literal
@@ -6,13 +7,14 @@ from pathlib import Path
 
 import mysql.connector
 from fastapi import FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import Path as FastAPIPath
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
 from starlette.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.db import initialize_database, probe_mysql
+from app.db import DatabaseError, initialize_database, probe_mysql
 from app.kanban import BoardPayload
 from app.repositories.user_repository import UserRepository
 from app.services.board_service import BoardService
@@ -29,12 +31,21 @@ from app.services.openai_service import (
     OpenAIUpstreamError,
 )
 
+logger = logging.getLogger(__name__)
+
 startup_db_error: str | None = None
 
 # M3: Simple in-memory rate limiter for login endpoint
 _login_attempts: dict[str, list[float]] = defaultdict(list)
 _LOGIN_RATE_LIMIT = 10
 _LOGIN_RATE_WINDOW = 60  # seconds
+
+
+def _get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 def _check_login_rate_limit(client_ip: str) -> None:
@@ -77,6 +88,14 @@ if settings.cors_origins:
 # M5: Database error handler
 @app.exception_handler(mysql.connector.Error)
 async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database temporarily unavailable."},
+    )
+
+
+@app.exception_handler(DatabaseError)
+async def database_error_handler(request: Request, exc: DatabaseError) -> JSONResponse:
     return JSONResponse(
         status_code=503,
         content={"detail": "Database temporarily unavailable."},
@@ -188,9 +207,9 @@ def auth_session(request: Request) -> dict:
     }
 
 
-@app.post("/api/auth/register")
+@app.post("/api/auth/register", status_code=201)
 def auth_register(payload: RegisterRequest, request: Request, response: Response) -> dict:
-    _check_login_rate_limit(request.client.host if request.client else "unknown")
+    _check_login_rate_limit(_get_client_ip(request))
 
     existing = user_repository.get_user_by_username(payload.username)
     if existing is not None:
@@ -205,7 +224,7 @@ def auth_register(payload: RegisterRequest, request: Request, response: Response
     try:
         board_service.create_board(payload.username, "My Board")
     except Exception:
-        pass  # Non-critical; user can create boards manually
+        logger.warning("Failed to create default board for user %s", payload.username, exc_info=True)
 
     response.set_cookie(
         key=settings.auth_cookie_name,
@@ -221,7 +240,7 @@ def auth_register(payload: RegisterRequest, request: Request, response: Response
 
 @app.post("/api/auth/login")
 def auth_login(payload: LoginRequest, request: Request, response: Response) -> dict:
-    _check_login_rate_limit(request.client.host if request.client else "unknown")
+    _check_login_rate_limit(_get_client_ip(request))
 
     # Try database-backed auth first
     user = user_repository.get_user_by_username(payload.username)
@@ -293,6 +312,7 @@ def auth_change_password(payload: ChangePasswordRequest, request: Request) -> di
 @app.delete("/api/auth/account", status_code=204)
 def auth_delete_account(request: Request, response: Response) -> None:
     username = _require_authenticated_username(request)
+    logger.info("Account deletion requested by user: %s", username)
     user_repository.delete_user(username)
     response.delete_cookie(key=settings.auth_cookie_name, path="/")
 
@@ -308,14 +328,13 @@ def list_boards(request: Request) -> list[dict]:
 @app.post("/api/boards", status_code=201)
 def create_board(payload: CreateBoardRequest, request: Request) -> dict:
     username = _require_authenticated_username(request)
-    if payload.template is not None:
-        from app.board_templates import TEMPLATE_NAMES
-        if payload.template not in TEMPLATE_NAMES:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Unknown template: {payload.template}",
-            )
-    return board_service.create_board(username, payload.name, template=payload.template)
+    try:
+        return board_service.create_board(username, payload.name, template=payload.template)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(error),
+        ) from error
 
 
 @app.get("/api/boards/{board_id}")
@@ -357,7 +376,7 @@ async def update_board_by_id(board_id: int, request: Request) -> dict:
         try:
             activity_service.diff_and_log(board_id, username, old_board, body)
         except Exception:
-            pass  # Non-critical; don't fail the save
+            logger.warning("Failed to log activity diff for board %s", board_id, exc_info=True)
     return result
 
 
@@ -389,7 +408,8 @@ def delete_board(board_id: int, request: Request) -> None:
 @app.get("/api/boards/{board_id}/cards/{card_id}/comments")
 def list_comments(
     board_id: int,
-    card_id: str,
+    card_id: str = FastAPIPath(..., max_length=255),
+    *,
     request: Request,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -407,7 +427,8 @@ def list_comments(
 @app.post("/api/boards/{board_id}/cards/{card_id}/comments", status_code=201)
 def add_comment(
     board_id: int,
-    card_id: str,
+    card_id: str = FastAPIPath(..., max_length=255),
+    *,
     payload: AddCommentRequest,
     request: Request,
 ) -> dict:
@@ -429,7 +450,8 @@ def add_comment(
 @app.delete("/api/boards/{board_id}/cards/{card_id}/comments/{comment_id}", status_code=204)
 def delete_comment(
     board_id: int,
-    card_id: str,
+    card_id: str = FastAPIPath(..., max_length=255),
+    *,
     comment_id: int,
     request: Request,
 ) -> None:

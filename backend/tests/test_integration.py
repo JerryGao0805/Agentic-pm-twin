@@ -137,7 +137,7 @@ def test_full_register_and_board_crud_flow(monkeypatch) -> None:
             "/api/auth/register",
             json={"username": "alice", "password": "password123"},
         )
-        assert r.status_code == 200
+        assert r.status_code == 201
         assert r.json() == {"authenticated": True, "username": "alice"}
 
         # 3. Session is now authenticated
@@ -238,7 +238,7 @@ def test_register_duplicate_username(monkeypatch) -> None:
             "/api/auth/register",
             json={"username": "alice", "password": "password123"},
         )
-        assert r.status_code == 200
+        assert r.status_code == 201
 
     with TestClient(main_module.app) as client:
         r = client.post(

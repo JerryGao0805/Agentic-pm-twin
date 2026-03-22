@@ -6,8 +6,8 @@ import { BoardSelector } from "@/components/BoardSelector";
 import { ProfileModal } from "@/components/ProfileModal";
 
 const LOCAL_AUTH_KEY = "pm-local-authenticated";
-const DEV_USERNAME = process.env.NODE_ENV !== "production" ? "user" : "";
-const DEV_PASSWORD = process.env.NODE_ENV !== "production" ? "password" : "";
+const DEV_USERNAME = process.env.NEXT_PUBLIC_DEV_USERNAME ?? "";
+const DEV_PASSWORD = process.env.NEXT_PUBLIC_DEV_PASSWORD ?? "";
 
 type AuthMode = "api" | "local";
 type AuthState = "loading" | "authenticated" | "unauthenticated";

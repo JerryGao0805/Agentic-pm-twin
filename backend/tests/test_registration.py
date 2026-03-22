@@ -41,7 +41,7 @@ def test_register_creates_new_user(monkeypatch) -> None:
             json={"username": "newuser", "password": "securepassword"},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json() == {"authenticated": True, "username": "newuser"}
     assert "newuser" in fake_repo.users
 

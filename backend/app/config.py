@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import logging
 import os
-import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +43,19 @@ class Settings:
                 "AUTH_PASSWORD is set to the default value 'password'. "
                 "Please set a strong password via the AUTH_PASSWORD environment variable."
             )
+        if not self.session_secret:
+            raise RuntimeError(
+                "SESSION_SECRET environment variable is required. "
+                "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        if os.getenv("ENVIRONMENT", "").lower() == "production" and not self.cookie_secure:
+            logger.warning(
+                "COOKIE_SECURE is not set in production. "
+                "Set COOKIE_SECURE=true for secure cookies."
+            )
 
     def _get_secret_key(self) -> str:
-        if self.session_secret:
-            return self.session_secret
-        return self.auth_password + self.db_password
+        return self.session_secret
 
     def sign_session(self, username: str) -> str:
         key = self._get_secret_key().encode()
