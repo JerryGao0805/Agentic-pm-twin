@@ -2,16 +2,19 @@ import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
-import type { Card } from "@/lib/kanban";
-import { priorityLabel, priorityColor } from "@/lib/kanban";
+import type { Card, Label } from "@/lib/kanban";
+import { priorityLabel, priorityColor, labelColor } from "@/lib/kanban";
+import { CardComments } from "@/components/CardComments";
 
 type KanbanCardProps = {
   card: Card;
+  labels?: Label[];
+  boardId?: number;
   onDelete: (cardId: string) => void;
   onUpdate: (updates: Partial<Card>) => void;
 };
 
-export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
+export const KanbanCard = ({ card, labels = [], boardId, onDelete, onUpdate }: KanbanCardProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
   const [isExpanded, setIsExpanded] = useState(false);
@@ -42,6 +45,25 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
           <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
             {card.details}
           </p>
+          {(card.label_ids ?? []).length > 0 && labels.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {(card.label_ids ?? []).map((lid) => {
+                const label = labels.find((l) => l.id === lid);
+                if (!label) return null;
+                return (
+                  <span
+                    key={lid}
+                    className={clsx(
+                      "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                      labelColor(label.color)
+                    )}
+                  >
+                    {label.name}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {card.priority ? (
               <span
@@ -138,6 +160,42 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
               className="mt-1 w-full rounded-lg border border-[var(--stroke)] bg-white px-2 py-1 text-xs text-[var(--navy-dark)] outline-none"
             />
           </div>
+          {labels.length > 0 ? (
+            <div>
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--gray-text)]">
+                Labels
+              </label>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {labels.map((label) => {
+                  const isSelected = (card.label_ids ?? []).includes(label.id);
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => {
+                        const current = card.label_ids ?? [];
+                        const next = isSelected
+                          ? current.filter((id) => id !== label.id)
+                          : [...current, label.id];
+                        onUpdate({ label_ids: next });
+                      }}
+                      className={clsx(
+                        "rounded-full border px-2 py-0.5 text-[10px] font-semibold transition",
+                        isSelected
+                          ? labelColor(label.color)
+                          : "border-[var(--stroke)] text-[var(--gray-text)] opacity-50 hover:opacity-100"
+                      )}
+                    >
+                      {label.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          {boardId ? (
+            <CardComments boardId={boardId} cardId={card.id} />
+          ) : null}
         </div>
       ) : null}
     </article>

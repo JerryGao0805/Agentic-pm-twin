@@ -24,7 +24,7 @@ class FakeBoardRepository:
             return self._boards[board_id]
         return self.saved_by_username.get(username, default_board())
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
+    def create_board(self, username: str, name: str, initial_board: dict[str, Any] | None = None) -> dict[str, Any]:
         board = default_board()
         bid = self._next_id
         self._next_id += 1

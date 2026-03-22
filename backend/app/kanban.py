@@ -20,6 +20,19 @@ ChatRole = Literal["user", "assistant"]
 _MAX_CARDS_PER_BOARD = 200
 _MAX_COLUMNS_PER_BOARD = 20
 _MIN_COLUMNS_PER_BOARD = 1
+_MAX_LABELS_PER_BOARD = 50
+
+LABEL_COLORS = (
+    "red", "orange", "yellow", "green", "blue", "indigo", "purple", "pink",
+)
+
+
+class LabelPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str = Field(max_length=50)
+    color: str = Field(max_length=20)
 
 
 class CardPayload(BaseModel):
@@ -31,6 +44,7 @@ class CardPayload(BaseModel):
     priority: Literal["low", "medium", "high"] | None = None
     due_date: str | None = Field(default=None, max_length=10)
     assignee: str | None = Field(default=None, max_length=100)
+    label_ids: list[str] = Field(default_factory=list)
 
 
 class ColumnPayload(BaseModel):
@@ -46,6 +60,7 @@ class BoardPayload(BaseModel):
 
     columns: list[ColumnPayload]
     cards: dict[str, CardPayload]
+    labels: list[LabelPayload] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_kanban_structure(self) -> BoardPayload:
@@ -88,10 +103,35 @@ class BoardPayload(BaseModel):
             if card_key != card.id:
                 raise ValueError("Card map keys must match each card object's id.")
 
+        # Label validation
+        if len(self.labels) > _MAX_LABELS_PER_BOARD:
+            raise ValueError(
+                f"Board cannot have more than {_MAX_LABELS_PER_BOARD} labels."
+            )
+
+        label_ids = [label.id for label in self.labels]
+        if len(label_ids) != len(set(label_ids)):
+            raise ValueError("Label IDs must be unique.")
+
+        valid_label_ids = set(label_ids)
+        for label in self.labels:
+            if label.color not in LABEL_COLORS:
+                raise ValueError(
+                    f"Invalid label color '{label.color}'. Must be one of: {', '.join(LABEL_COLORS)}."
+                )
+
+        for card in self.cards.values():
+            for lid in card.label_ids:
+                if lid not in valid_label_ids:
+                    raise ValueError(
+                        f"Card '{card.id}' references unknown label ID '{lid}'."
+                    )
+
         return self
 
 
 INITIAL_BOARD_DATA: dict[str, Any] = {
+    "labels": [],
     "columns": [
         {"id": "col-backlog", "title": "Backlog", "cardIds": ["card-1", "card-2"]},
         {"id": "col-discovery", "title": "Discovery", "cardIds": ["card-3"]},

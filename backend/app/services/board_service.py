@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.board_templates import get_template_board, TEMPLATE_NAMES
 from app.kanban import BoardPayload
 from app.repositories.board_repository import BoardRepository
 
@@ -24,8 +25,13 @@ class BoardService:
         result.update(board_meta)
         return result
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
-        board = self._repository.create_board(username, name)
+    def create_board(self, username: str, name: str, template: str | None = None) -> dict[str, Any]:
+        initial_board = None
+        if template is not None:
+            if template not in TEMPLATE_NAMES:
+                raise ValueError(f"Unknown template: {template}")
+            initial_board = get_template_board(template)
+        board = self._repository.create_board(username, name, initial_board=initial_board)
         board_meta = {k: v for k, v in board.items() if k in ("id", "name")}
         board_data = {k: v for k, v in board.items() if k not in ("id", "name")}
         validated_board = BoardPayload.model_validate(board_data)

@@ -57,7 +57,7 @@ class FakeBoardService:
         board = default_board()
         return board
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
+    def create_board(self, username: str, name: str, template: str | None = None) -> dict[str, Any]:
         board = default_board()
         bid = self._next_id
         self._next_id += 1
@@ -89,6 +89,17 @@ class FakeBoardService:
         return False
 
 
+class FakeActivityService:
+    def list_activity(self, board_id, limit=50, offset=0):
+        return []
+
+    def log_activity(self, board_id, username, action, details=None):
+        pass
+
+    def diff_and_log(self, board_id, username, old_board, new_board):
+        pass
+
+
 class FakeChatService:
     def __init__(self) -> None:
         self.messages: list[dict[str, str]] = []
@@ -104,9 +115,11 @@ def _setup_services(monkeypatch):
     fake_user_repo = FakeUserRepository()
     fake_board_service = FakeBoardService()
     fake_chat_service = FakeChatService()
+    fake_activity_service = FakeActivityService()
     monkeypatch.setattr(main_module, "user_repository", fake_user_repo)
     monkeypatch.setattr(main_module, "board_service", fake_board_service)
     monkeypatch.setattr(main_module, "chat_service", fake_chat_service)
+    monkeypatch.setattr(main_module, "activity_service", fake_activity_service)
     return fake_user_repo, fake_board_service, fake_chat_service
 
 

@@ -245,6 +245,40 @@ def initialize_database() -> None:
                 ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """,
+        """
+        CREATE TABLE IF NOT EXISTS card_comments (
+            id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            board_id BIGINT NOT NULL,
+            card_id VARCHAR(255) NOT NULL,
+            user_id BIGINT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_card_comments_board_card (board_id, card_id),
+            CONSTRAINT fk_card_comments_board
+                FOREIGN KEY (board_id) REFERENCES boards(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_card_comments_user
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS board_activity (
+            id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            board_id BIGINT NOT NULL,
+            user_id BIGINT NOT NULL,
+            action VARCHAR(50) NOT NULL,
+            details JSON NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_board_activity_board_created (board_id, created_at),
+            CONSTRAINT fk_board_activity_board
+                FOREIGN KEY (board_id) REFERENCES boards(id)
+                ON DELETE CASCADE,
+            CONSTRAINT fk_board_activity_user
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """,
     )
 
     connection = None

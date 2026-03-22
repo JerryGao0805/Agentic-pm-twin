@@ -21,6 +21,8 @@ from app.services.ai_assistant_service import (
     AIAssistantFormatError,
     AIAssistantService,
 )
+from app.services.activity_service import ActivityService
+from app.services.comment_service import CommentService
 from app.services.openai_service import (
     OpenAIConfigError,
     OpenAIService,
@@ -80,8 +82,10 @@ async def mysql_error_handler(request: Request, exc: mysql.connector.Error) -> J
         content={"detail": "Database temporarily unavailable."},
     )
 
+activity_service = ActivityService()
 board_service = BoardService()
 chat_service = ChatService()
+comment_service = CommentService()
 openai_service = OpenAIService()
 ai_assistant_service = AIAssistantService(openai_service=openai_service)
 user_repository = UserRepository()
@@ -125,10 +129,20 @@ class AIChatResponse(BaseModel):
 
 class CreateBoardRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    template: str | None = None
 
 
 class RenameBoardRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6, max_length=128)
+
+
+class AddCommentRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=2000)
 
 
 def _is_authenticated(request: Request) -> bool:
@@ -246,6 +260,43 @@ def auth_logout(response: Response) -> dict:
     return {"authenticated": False, "username": None}
 
 
+@app.get("/api/auth/profile")
+def auth_profile(request: Request) -> dict:
+    username = _require_authenticated_username(request)
+    profile = user_repository.get_profile(username)
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+    return profile
+
+
+@app.patch("/api/auth/password")
+def auth_change_password(payload: ChangePasswordRequest, request: Request) -> dict:
+    username = _require_authenticated_username(request)
+    user = user_repository.get_user_by_username(username)
+    if user is None or not user.get("password_hash"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+    if not user_repository.verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+        )
+    user_repository.update_password(username, payload.new_password)
+    return {"message": "Password updated."}
+
+
+@app.delete("/api/auth/account", status_code=204)
+def auth_delete_account(request: Request, response: Response) -> None:
+    username = _require_authenticated_username(request)
+    user_repository.delete_user(username)
+    response.delete_cookie(key=settings.auth_cookie_name, path="/")
+
+
 # --- Board CRUD ---
 
 @app.get("/api/boards")
@@ -257,7 +308,14 @@ def list_boards(request: Request) -> list[dict]:
 @app.post("/api/boards", status_code=201)
 def create_board(payload: CreateBoardRequest, request: Request) -> dict:
     username = _require_authenticated_username(request)
-    return board_service.create_board(username, payload.name)
+    if payload.template is not None:
+        from app.board_templates import TEMPLATE_NAMES
+        if payload.template not in TEMPLATE_NAMES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown template: {payload.template}",
+            )
+    return board_service.create_board(username, payload.name, template=payload.template)
 
 
 @app.get("/api/boards/{board_id}")
@@ -281,6 +339,7 @@ def get_board_by_id(board_id: int, request: Request) -> dict:
 @app.put("/api/boards/{board_id}")
 async def update_board_by_id(board_id: int, request: Request) -> dict:
     username = _require_authenticated_username(request)
+    old_board = board_service.get_board(username, board_id=board_id)
     body = await request.json()
     try:
         result = board_service.save_board(username, body, board_id=board_id)
@@ -294,6 +353,11 @@ async def update_board_by_id(board_id: int, request: Request) -> dict:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Board not found.",
         )
+    if old_board is not None:
+        try:
+            activity_service.diff_and_log(board_id, username, old_board, body)
+        except Exception:
+            pass  # Non-critical; don't fail the save
     return result
 
 
@@ -318,6 +382,83 @@ def delete_board(board_id: int, request: Request) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Board not found.",
         )
+
+
+# --- Card Comments ---
+
+@app.get("/api/boards/{board_id}/cards/{card_id}/comments")
+def list_comments(
+    board_id: int,
+    card_id: str,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict]:
+    username = _require_authenticated_username(request)
+    board = board_service.get_board(username, board_id=board_id)
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found.",
+        )
+    return comment_service.list_comments(board_id, card_id, limit=limit, offset=offset)
+
+
+@app.post("/api/boards/{board_id}/cards/{card_id}/comments", status_code=201)
+def add_comment(
+    board_id: int,
+    card_id: str,
+    payload: AddCommentRequest,
+    request: Request,
+) -> dict:
+    username = _require_authenticated_username(request)
+    board = board_service.get_board(username, board_id=board_id)
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found.",
+        )
+    if card_id not in board.get("cards", {}):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Card not found.",
+        )
+    return comment_service.add_comment(board_id, card_id, username, payload.content)
+
+
+@app.delete("/api/boards/{board_id}/cards/{card_id}/comments/{comment_id}", status_code=204)
+def delete_comment(
+    board_id: int,
+    card_id: str,
+    comment_id: int,
+    request: Request,
+) -> None:
+    username = _require_authenticated_username(request)
+    success = comment_service.delete_comment(comment_id, username)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Comment not found.",
+        )
+
+
+# --- Board Activity ---
+
+@app.get("/api/boards/{board_id}/activity")
+def list_activity(
+    board_id: int,
+    request: Request,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> list[dict]:
+    username = _require_authenticated_username(request)
+    board = board_service.get_board(username, board_id=board_id)
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found.",
+        )
+    return activity_service.list_activity(board_id, limit=limit, offset=offset)
 
 
 # --- Legacy single-board endpoints (backwards compatible) ---

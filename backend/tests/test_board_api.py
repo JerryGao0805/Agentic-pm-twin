@@ -18,7 +18,7 @@ class FailingBoardService:
     def list_boards(self, username: str) -> list[dict[str, Any]]:
         raise MySQLError("Connection refused")
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
+    def create_board(self, username: str, name: str, template: str | None = None) -> dict[str, Any]:
         raise MySQLError("Connection refused")
 
     def delete_board(self, username: str, board_id: int) -> bool:
@@ -47,7 +47,7 @@ class FakeBoardService:
         board["columns"][0]["title"] = f"Backlog ({username})"
         return board
 
-    def create_board(self, username: str, name: str) -> dict[str, Any]:
+    def create_board(self, username: str, name: str, template: str | None = None) -> dict[str, Any]:
         board = default_board()
         bid = self._next_id
         self._next_id += 1

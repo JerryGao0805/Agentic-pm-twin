@@ -43,7 +43,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script_stop: true
           script: |
-            cd /home/ubuntu/pm_twin
+            cd /home/ubuntu/Agentic-pm-twin
             git fetch origin main
             git reset --hard origin/main
             docker compose -f docker-compose.prod.yml up --build -d
