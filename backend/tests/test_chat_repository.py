@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Any
 
 import app.repositories.chat_repository as repository_module
@@ -34,12 +35,20 @@ class RecordingConnection:
         return None
 
 
+def _patch_db(monkeypatch, cursor, connection):
+    @contextmanager
+    def fake_db_connection(*, commit=True):
+        yield connection, cursor
+        if commit:
+            connection.commit()
+    monkeypatch.setattr(repository_module, "db_connection", fake_db_connection)
+    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 42)
+
+
 def test_list_messages_returns_chat_rows(monkeypatch) -> None:
     cursor = RecordingCursor(fetchall_values=[("user", "hello"), ("assistant", "hi")])
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 42)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = ChatRepository()
     messages = repository.list_messages("user")
@@ -55,9 +64,7 @@ def test_list_messages_returns_chat_rows(monkeypatch) -> None:
 def test_list_messages_with_board_id(monkeypatch) -> None:
     cursor = RecordingCursor(fetchall_values=[("user", "board msg")])
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 42)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = ChatRepository()
     messages = repository.list_messages("user", board_id=5)
@@ -69,9 +76,7 @@ def test_list_messages_with_board_id(monkeypatch) -> None:
 def test_append_message_inserts_chat_row(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 42)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = ChatRepository()
     repository.append_message("user", "assistant", "done")
@@ -90,9 +95,7 @@ def test_append_message_inserts_chat_row(monkeypatch) -> None:
 def test_append_message_with_board_id(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
-    monkeypatch.setattr(repository_module, "ensure_user_id", lambda _cursor, _username: 42)
+    _patch_db(monkeypatch, cursor, connection)
 
     repository = ChatRepository()
     repository.append_message("user", "user", "hello", board_id=7)

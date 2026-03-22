@@ -2,19 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.config import settings
-from app.db import ensure_user_id, get_connection
+from app.db import db_connection, ensure_user_id
 
 
 class CommentRepository:
     def list_comments(
         self, board_id: int, card_id: str, limit: int = 50, offset: int = 0
     ) -> list[dict[str, Any]]:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
+        with db_connection(commit=False) as (connection, cursor):
             cursor.execute(
                 "SELECT cc.id, cc.card_id, u.username, cc.content, cc.created_at "
                 "FROM card_comments cc JOIN users u ON cc.user_id = u.id "
@@ -33,20 +28,11 @@ class CommentRepository:
                 }
                 for row in rows
             ]
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()
 
     def add_comment(
         self, board_id: int, card_id: str, username: str, content: str
     ) -> dict[str, Any]:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
+        with db_connection() as (connection, cursor):
             user_id = ensure_user_id(cursor, username)
             cursor.execute(
                 "INSERT INTO card_comments (board_id, card_id, user_id, content) "
@@ -59,7 +45,6 @@ class CommentRepository:
                 (comment_id,),
             )
             row = cursor.fetchone()
-            connection.commit()
             return {
                 "id": comment_id,
                 "card_id": card_id,
@@ -67,38 +52,18 @@ class CommentRepository:
                 "content": content,
                 "created_at": str(row[0]) if row else "",
             }
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()
 
     def delete_comment(self, comment_id: int, username: str) -> bool:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
+        with db_connection() as (connection, cursor):
             user_id = ensure_user_id(cursor, username)
             cursor.execute(
                 "DELETE FROM card_comments WHERE id = %s AND user_id = %s",
                 (comment_id, user_id),
             )
-            deleted = cursor.rowcount > 0
-            connection.commit()
-            return deleted
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()
+            return cursor.rowcount > 0
 
     def get_comment_counts(self, board_id: int) -> dict[str, int]:
-        connection = None
-        cursor = None
-        try:
-            connection = get_connection(database=settings.db_name)
-            cursor = connection.cursor()
+        with db_connection(commit=False) as (connection, cursor):
             cursor.execute(
                 "SELECT card_id, COUNT(*) FROM card_comments "
                 "WHERE board_id = %s GROUP BY card_id",
@@ -106,8 +71,3 @@ class CommentRepository:
             )
             rows = cursor.fetchall()
             return {str(row[0]): int(row[1]) for row in rows}
-        finally:
-            if cursor is not None:
-                cursor.close()
-            if connection is not None:
-                connection.close()

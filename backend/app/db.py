@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import logging
+from contextlib import contextmanager
+from typing import Any, Generator
 
 import bcrypt
 import mysql.connector
@@ -10,6 +12,12 @@ from mysql.connector.pooling import MySQLConnectionPool
 
 from app.config import settings
 from app.kanban import default_board
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseError(Exception):
+    """Domain-specific exception for database errors."""
 
 _pool: MySQLConnectionPool | None = None
 
@@ -47,13 +55,33 @@ def _connect(*, database: str | None, use_admin_credentials: bool) -> Any:
     return mysql.connector.connect(**params)
 
 
-def get_connection(database: str | None = None) -> Any:
+def get_connection(database: str | None = None) -> mysql.connector.MySQLConnection:
     if database == settings.db_name:
         try:
             return _get_pool().get_connection()
         except Error:
             pass
     return _connect(database=database, use_admin_credentials=False)
+
+
+@contextmanager
+def db_connection(*, commit: bool = True) -> Generator[tuple[Any, Any], None, None]:
+    connection = None
+    cursor = None
+    try:
+        connection = get_connection(database=settings.db_name)
+        cursor = connection.cursor()
+        yield connection, cursor
+        if commit:
+            connection.commit()
+    except Error as exc:
+        logger.exception("Database error: %s", exc)
+        raise DatabaseError(str(exc)) from exc
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
 
 
 def _create_database_if_missing() -> None:

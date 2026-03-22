@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Any
 
 import app.repositories.user_repository as repository_module
@@ -40,10 +41,19 @@ class RecordingConnection:
         return None
 
 
+def _patch_db(monkeypatch, cursor, connection):
+    @contextmanager
+    def fake_db_connection(*, commit=True):
+        yield connection, cursor
+        if commit:
+            connection.commit()
+    monkeypatch.setattr(repository_module, "db_connection", fake_db_connection)
+
+
 def test_create_user_inserts_with_hashed_password(monkeypatch) -> None:
     cursor = RecordingCursor()
     connection = RecordingConnection(cursor)
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
+    _patch_db(monkeypatch, cursor, connection)
 
     repo = UserRepository()
     user_id = repo.create_user("alice", "secret123")
@@ -62,7 +72,7 @@ def test_create_user_inserts_with_hashed_password(monkeypatch) -> None:
 def test_get_user_by_username_returns_user(monkeypatch) -> None:
     cursor = RecordingCursor(fetch_values=[(10, "bob", "$2b$12$hash")])
     connection = RecordingConnection(cursor)
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
+    _patch_db(monkeypatch, cursor, connection)
 
     repo = UserRepository()
     user = repo.get_user_by_username("bob")
@@ -76,7 +86,7 @@ def test_get_user_by_username_returns_user(monkeypatch) -> None:
 def test_get_user_by_username_returns_none_for_missing(monkeypatch) -> None:
     cursor = RecordingCursor(fetch_values=[])
     connection = RecordingConnection(cursor)
-    monkeypatch.setattr(repository_module, "get_connection", lambda database=None: connection)
+    _patch_db(monkeypatch, cursor, connection)
 
     repo = UserRepository()
     user = repo.get_user_by_username("nonexistent")

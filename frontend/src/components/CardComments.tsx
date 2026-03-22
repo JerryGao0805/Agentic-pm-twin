@@ -19,6 +19,7 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadComments = useCallback(async () => {
     try {
@@ -28,9 +29,10 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
       );
       if (resp.ok) {
         setComments(await resp.json());
+        setError(null);
       }
     } catch {
-      // ignore
+      setError("Failed to load comments.");
     }
   }, [boardId, cardId]);
 
@@ -55,10 +57,13 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
       );
       if (resp.ok) {
         setNewComment("");
+        setError(null);
         await loadComments();
+      } else {
+        setError("Failed to post comment.");
       }
     } catch {
-      // ignore
+      setError("Failed to post comment.");
     } finally {
       setIsSubmitting(false);
     }
@@ -72,7 +77,7 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
       );
       await loadComments();
     } catch {
-      // ignore
+      setError("Failed to delete comment.");
     }
   };
 
@@ -100,8 +105,9 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
                     type="button"
                     onClick={() => handleDelete(c.id)}
                     className="text-[var(--gray-text)] hover:text-[#b42318]"
+                    aria-label="Delete comment"
                   >
-                    x
+                    ×
                   </button>
                 </div>
               </div>
@@ -109,6 +115,9 @@ export const CardComments = ({ boardId, cardId }: CardCommentsProps) => {
             </div>
           ))}
         </div>
+      ) : null}
+      {error ? (
+        <p className="mt-1 text-[10px] font-semibold text-[#b42318]">{error}</p>
       ) : null}
       <div className="mt-2 flex gap-2">
         <input
