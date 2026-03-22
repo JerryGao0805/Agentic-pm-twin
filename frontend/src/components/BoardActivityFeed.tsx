@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type ActivityEntry = {
   id: number;
@@ -58,25 +58,30 @@ const actionIcon = (action: string): string => {
 export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
   const [entries, setEntries] = useState<ActivityEntry[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-
-  const loadActivity = useCallback(async () => {
-    try {
-      const resp = await fetch(`/api/boards/${boardId}/activity?limit=30`, {
-        credentials: "include",
-      });
-      if (resp.ok) {
-        setEntries(await resp.json());
-      }
-    } catch {
-      // ignore
-    }
-  }, [boardId]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (isOpen) {
-      void loadActivity();
-    }
-  }, [isOpen, loadActivity]);
+    if (!isOpen) return;
+
+    let active = true;
+    const fetchActivity = async () => {
+      try {
+        const resp = await fetch(`/api/boards/${boardId}/activity?limit=30`, {
+          credentials: "include",
+        });
+        if (resp.ok && active) {
+          setEntries(await resp.json());
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void fetchActivity();
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, boardId, refreshKey]);
 
   return (
     <div className="rounded-2xl border border-[var(--stroke)] bg-white/80 shadow-[var(--shadow)] backdrop-blur">
@@ -120,7 +125,7 @@ export const BoardActivityFeed = ({ boardId }: BoardActivityFeedProps) => {
           )}
           <button
             type="button"
-            onClick={() => void loadActivity()}
+            onClick={() => setRefreshKey((k) => k + 1)}
             className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-[var(--primary-blue)] hover:underline"
           >
             Refresh

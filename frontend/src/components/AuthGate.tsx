@@ -37,6 +37,8 @@ export const AuthGate = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -279,8 +281,6 @@ export const AuthGate = () => {
     );
   }
 
-  const [showProfile, setShowProfile] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const displayUsername = loggedInUsername || DEV_USERNAME;
 
   return (
