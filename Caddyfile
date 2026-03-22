@@ -1,0 +1,13 @@
+# For HTTP-only via Elastic IP (no domain), use:
+#   :80 {
+#       reverse_proxy app:8000
+#   }
+#
+# For automatic HTTPS with a domain, replace with:
+#   yourdomain.com {
+#       reverse_proxy app:8000
+#   }
+
+:80 {
+    reverse_proxy app:8000
+}
